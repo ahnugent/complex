@@ -23,7 +23,7 @@ import math
 
 #define python3
 
-def Csign(x):
+def signimag(x):
     # assigns sign char for imaginary part
     if x >= 0:
         s = "+"
@@ -46,17 +46,6 @@ class Cvector:
             return 0
         else:
             return math.atan2(self.b, self.a)
-    def Cformat(self, complexformat = "i"):
-        # returns a string representation of a complex number as...
-        #    a + ib  if complexformat = "i"
-        #    a, b    if complexformat = ","
-        #    (a, b)  if complexformat = "("
-        if (complexformat == "i"):
-            return("{0} {1}i{2}".format(self.a, Csign(self.b), abs(self.b)))
-        elif (complexformat == ","):
-            return("{0}, {1}".format(self.a, self.b))
-        else:    #  complexformat == "," or undefined
-            return("({0}, {1})".format(self.a, self.b))
     def type(self):
         return 'vector'
 
@@ -72,24 +61,8 @@ class Cphasor:
         return self.r
     def phase(self):
         return self.p
-    def Cformat(self, complexformat = ","):
-        if (complexformat == ","):
-            return ("{0}, @{1}".format(r, p))
-        elif (complexformat == "("):
-            return ("({0}, @{1})".format(r, p))
-        else:
-            return ("{0} @{1}".format(r, p))
     def type(self):
         return 'phasor'
-
-def getComplexFormat(s):
-    if (s1.find('i') >= 0):
-        complexformat = "i"
-    elif(s1.find('(') >= 0):
-        complexformat = "("
-    else:
-        complexformat = ""
-    return complexformat
 
 def PhasorToVector(p):
     v = Cvector()
@@ -179,13 +152,10 @@ def parseOp(s):
     return op
 
 def operate(c1, op, c2):
+    usephasors = (c1.type() == 'phasor')
 
-    if op in ('|', '@'):
-        # output of monadic operations is a phasor:
-        usephasors = True
-    else:
-        # default to vector arithmetic if mixed types were entered (ignore for monadic operations):
-        usephasors = (c1.type() == 'phasor')
+    # default to vector arithmetic if mixed types were entered (ignore for monadic operations):
+    if op not in ('|', '@'):
         #X: if type(c2).__name__ == 'Cphasor':
         if c1.type() == 'vector' and c2.type() == 'phasor':
             c2 = PhasorToVector(c2)
@@ -197,17 +167,13 @@ def operate(c1, op, c2):
     else:
         c3 = Cvector()
 
-#    # unary operations returns a monad ...
-#    if op == '|':  
-#        c3.a = c1.modulus()
-#        c3.b = 'nan'
-#    elif op == '@':
-#        c3.a = c1.phase()
-#        c3.b = 'nan'
-
-    # unary operations are already covered by the Cphasor methods, so just return the input as a phasor ...
-    if op in ('|', '@'):
-        c3 = VectorToPhasor(c1)
+    # unary operations returns a monad ...
+    if op == '|':  
+        c3.a = c1.modulus()
+        c3.b = 'nan'
+    elif op == '@':
+        c3.a = c1.phase()
+        c3.b = 'nan'
     # binary operations return a dyad ...
     elif op in ('+', '-'):  
         if usephasors:   # no simple phasor method for addition, so convert to vector
@@ -259,7 +225,16 @@ def operate(c1, op, c2):
 
     return c3, usephasors
 
-
+def printComplexI(a, b):
+    print("{0} {1}i{2}".format(a, signimag(b), b))
+                    
+def printComplexP(r, p):
+    print("{0} @{1}".format(r, p))
+                        
+def printComplex(a, b):
+    print("{0}, {1}".format(a, b))
+                        
+    
 # symbols for defined operations:
 ops = ('+', '-', '*', '/', '|', '@')
 # TODO: create a lookup incl. words 'addition',... 'modulus', 'phase'
@@ -296,7 +271,7 @@ s1 = input(prompt0)
 
 while len(s1) != 0:
     v1 = parseComplex(s1)
-    complexformat = getComplexFormat(s1)  #: discover which format has been entered
+    complexformat = (s1.find('i') >= 0)  #: discover which format has been entered
     # python2 s2 = raw_input(prompt2)
     s2 = input(prompt2)
 
@@ -310,20 +285,24 @@ while len(s1) != 0:
         v3, usephasors = operate(v1, op, v2)
 
         if op in ('|', '@'):   # modulus or phase
-            if (op == '|'):
-                f3 = v3.modulus()
-            elif (op == '@'):
-                f3 = v3.phase()
             #ifdef python3
             if doStackOutput:
-                print("{0}".format(v1.Cformat(complexformat)))
+                if (complexformat):
+                    printComplexI(v1.a, v1.b)
+                elif (usephasors):
+                    printComplexP(v1.modulus(), v1.phase())
                 print("{0}".format(op))
                 print(' = ')
-                print("{0}".format(f3))
+                if (op == '|'):
+                    print("{0}".format(v3.modulus()))
+                else:
+                    print("@{0}".format(v3.phase()))
+                    
             else:
-                #print("({0}, @{1} {2} = {3})".format(v1.modulus(), v1.phase()), op, v3.phase())
-                print("{0} {1} = {2}".format("1 + i2", "|", 99))
-                print("{0} {1} = {2}".format(v1.Cformat(complexformat), op, f3))
+                if (op == '|'):
+                    print("({0}, @{1} {2} = {3})".format(v1.modulus(), v1.phase()), op, v3.modulus())
+                else:
+                    print("({0}, @{1} {2} = {3})".format(v1.modulus(), v1.phase()), op, v3.phase())
             #ifdef python2
 #            if doStackOutput:
 #                print formatV % (v1.a, v1.b)
@@ -334,90 +313,78 @@ while len(s1) != 0:
 #                print (formatV % (v1.a, v1.b) + ' ' + op + ' = ' + v3.a)
             #endif
         else:
-            if doStackOutput:
-                print("{0}".format(v1.Cformat(complexformat)))
-                print("{0}".format(op))
-                print("{0}".format(v2.Cformat(complexformat)))
-                print(' = ')
-                print("{0}".format(v3.Cformat(complexformat)))
-            else:
-                print("{0} {1}i {2} {3} {4} {5}i {6} = {7} {8}i {9}".format(v1.a, Csign(v1.b), v1.b, 
-                      op, v2.a, Csign(v2.b), v2.b, v3.a, Csign(v3.b), v3.b))
-                print("{0} {1} {2} = {3}".format(v1.Cformat(complexformat)), 
-                      op, v2.Cformat(complexformat), v3.Cformat(complexformat))
-                
-#            if complexformat:      # use complex notation
-#                #ifdef python3
+            if complexformat:      # use complex notation
+                #ifdef python3
+                if doStackOutput:
+                    printComplexI(v1.a, v1.b)
+                    print("{0}".format(op))
+                    printComplexI(v2.a, v2.b)
+                    print(' = ')
+                    printComplexI(v3.a, v3.b)
+                else:
+                    print("{0} {1}i {2} {3} {4} {5}i {6} = {7} {8}i {9}".format(v1.a, signimag(v1.b), v1.b, 
+                          op, v2.a, signimag(v2.b), v2.b, v3.a, signimag(v3.b), v3.b))
+                #endif
+                #ifdef python2
 #                if doStackOutput:
-#                    printComplexI(v1.a, v1.b)
-#                    print("{0}".format(op))
-#                    printComplexI(v2.a, v2.b)
-#                    print(' = ')
-#                    printComplexI(v3.a, v3.b)
+#                    print formatC % (v1.a, (' ' + (v1.b / abs(v1.b)) + 'i '), v1.b) # (%d %s%d)
+#                    print (op)
+#                    print formatC % (v2.a, (' ' + (v2.b / abs(v2.b)) + 'i '), v2.b)
+#                    print ' = '
+#                    print formatC % (v3.a, (' ' + (v3.b / abs(v3.b)) + 'i '), v3.b)
 #                else:
-#                    print("{0} {1}i {2} {3} {4} {5}i {6} = {7} {8}i {9}".format(v1.a, Csign(v1.b), v1.b, 
-#                          op, v2.a, Csign(v2.b), v2.b, v3.a, Csign(v3.b), v3.b))
-#                #endif
-#                #ifdef python2
-##                if doStackOutput:
-##                    print formatC % (v1.a, (' ' + (v1.b / abs(v1.b)) + 'i '), v1.b) # (%d %s%d)
-##                    print (op)
-##                    print formatC % (v2.a, (' ' + (v2.b / abs(v2.b)) + 'i '), v2.b)
-##                    print ' = '
-##                    print formatC % (v3.a, (' ' + (v3.b / abs(v3.b)) + 'i '), v3.b)
-##                else:
-##                    print (formatC % (v1.a, (' ' + (v1.b / abs(v1.b)) + 'i '), v1.b) + ' ' + op + ' '
-##                        + formatC % (v2.a, (' ' + (v2.b / abs(v2.b)) + 'i '), v2.b) + ' = '
-##                        + formatC % (v3.a, (' ' + (v3.b / abs(v3.b)) + 'i '), v3.b))
-#                 #endif
-#            elif usephasors:       # use phasor notation
-#                #ifdef python3
+#                    print (formatC % (v1.a, (' ' + (v1.b / abs(v1.b)) + 'i '), v1.b) + ' ' + op + ' '
+#                        + formatC % (v2.a, (' ' + (v2.b / abs(v2.b)) + 'i '), v2.b) + ' = '
+#                        + formatC % (v3.a, (' ' + (v3.b / abs(v3.b)) + 'i '), v3.b))
+                 #endif
+            elif usephasors:       # use phasor notation
+                #ifdef python3
+                if doStackOutput:
+                    printComplexP(v1.modulus(), v1.phase())
+                    print("{0}".format(op))
+                    printComplexP(v2.modulus(), v2.phase())
+                    print(" = ")
+                    printComplexP(v3.modulus(), v3.phase())
+                else:
+                    print("{0} @ {1} {2} {3} @ {4} = {5} @ {6}".format(v1.modulus(), v1.phase(), 
+                          op, v2.modulus(), v2.phase(), v3.modulus(), v3.phase()))
+                #endif
+                #ifdef python2
 #                if doStackOutput:
-#                    printComplexP(v1.modulus(), v1.phase())
-#                    print("{0}".format(op))
-#                    printComplexP(v2.modulus(), v2.phase())
-#                    print(" = ")
-#                    printComplexP(v3.modulus(), v3.phase())
+#                    print formatA % (v1.modulus(), ' @ ', v1.phase()) # (%d%s%d)
+#                    print (op)
+#                    print formatA % (v2.modulus(), ' @ ', v2.phase())
+#                    print ' = '
+#                    print formatA % (v3.modulus(), ' @ ', v3.phase())
 #                else:
-#                    print("{0} @ {1} {2} {3} @ {4} = {5} @ {6}".format(v1.modulus(), v1.phase(), 
-#                          op, v2.modulus(), v2.phase(), v3.modulus(), v3.phase()))
-#                #endif
-#                #ifdef python2
-##                if doStackOutput:
-##                    print formatA % (v1.modulus(), ' @ ', v1.phase()) # (%d%s%d)
-##                    print (op)
-##                    print formatA % (v2.modulus(), ' @ ', v2.phase())
-##                    print ' = '
-##                    print formatA % (v3.modulus(), ' @ ', v3.phase())
-##                else:
-##                    print (formatA % (v1.modulus(), ' @ ', v1.phase()) + ' ' + op + ' '
-##                        + formatA % (v2.modulus(), ' @ ', v2.phase()) + ' = '
-##                        + formatA % (v3.modulus(), ' @ ', v3.phase()))
-#                #endif
-#            else:                  # use vector notation
-#                #ifdef python3
+#                    print (formatA % (v1.modulus(), ' @ ', v1.phase()) + ' ' + op + ' '
+#                        + formatA % (v2.modulus(), ' @ ', v2.phase()) + ' = '
+#                        + formatA % (v3.modulus(), ' @ ', v3.phase()))
+                #endif
+            else:                  # use vector notation
+                #ifdef python3
+                if doStackOutput:
+                    printComplex3(v1.a, v1.b)
+                    print("{0}".format(op))
+                    printComplex3(v2.a, v2.b)
+                    print(' = ')
+                    printComplex3(v3.a, v3.b)
+                else:
+                    print("{0}, {1} {2} {3}, {4} = {5}, {6}".format(v1.a, v1.b, 
+                          op, v2.a, v2.b, v3.a, v3.b))
+                #endif
+                #ifdef python2
 #                if doStackOutput:
-#                    printComplex3(v1.a, v1.b)
-#                    print("{0}".format(op))
-#                    printComplex3(v2.a, v2.b)
-#                    print(' = ')
-#                    printComplex3(v3.a, v3.b)
+#                    print formatV % (v1.a, v1.b) # (%d,%d)
+#                    print (op)
+#                    print formatV % (v2.a, v2.b)
+#                    print ' = '
+#                    print formatV % (v3.a, v3.b)
 #                else:
-#                    print("{0}, {1} {2} {3}, {4} = {5}, {6}".format(v1.a, v1.b, 
-#                          op, v2.a, v2.b, v3.a, v3.b))
-#                #endif
-#                #ifdef python2
-##                if doStackOutput:
-##                    print formatV % (v1.a, v1.b) # (%d,%d)
-##                    print (op)
-##                    print formatV % (v2.a, v2.b)
-##                    print ' = '
-##                    print formatV % (v3.a, v3.b)
-##                else:
-##                    print (formatV % (v1.a, v1.b) + ' ' + op + ' '
-##                        + formatV % (v2.a, v2.b) + ' = '
-##                        + formatV % (v3.a, v3.b))
-#                #endif
+#                    print (formatV % (v1.a, v1.b) + ' ' + op + ' '
+#                        + formatV % (v2.a, v2.b) + ' = '
+#                        + formatV % (v3.a, v3.b))
+                #endif
 
     # python2 s1 = raw_input(prompt1)
     s1 = input(prompt1)
